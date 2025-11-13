@@ -1,17 +1,19 @@
+"use client"; // 👈 MUST be the very first line — no blank lines above this!
+
 import { createContext, useEffect, useState, useMemo } from "react";
 import { io } from "socket.io-client";
 
-export const SocketContext = createContext();
+export const SocketContext = createContext<any>(null);
 
-export default function SocketProvider({ children }) {
+export default function SocketProvider({ children }: { children: React.ReactNode }) {
   const socket = useMemo(() => io("http://localhost:3001"), []);
-  const [notification, setNotification] = useState(null);
+
+  const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
     socket.on("newNotification", (data) => {
       console.log("🔔 Notification:", data);
       setNotification(data.text);
-
       setTimeout(() => setNotification(null), 5000);
     });
 

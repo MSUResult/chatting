@@ -12,7 +12,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-  
 });
 
 export const metadata: Metadata = {
@@ -30,8 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* ✅ Wrapping Providers */}
         <SocketProvider>
-        <UserProvider>{children}</UserProvider>
+          <UserProvider>{children}</UserProvider>
         </SocketProvider>
       </body>
     </html>
