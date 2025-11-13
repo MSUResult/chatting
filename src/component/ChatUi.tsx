@@ -1,96 +1,77 @@
 "use client";
 import { useContext, useEffect, useState } from "react";
 import { UserContext } from "@/src/context/userContext";
+import { io } from "socket.io-client";
+
+const socket = io("https://localhost:3001" , {transports:["websocket"]})
 
 export default function ChatUiClient({ slug }) {
   const { name } = useContext(UserContext);
-  const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [datas, setDatas] = useState([]);
 
-  console.log("🔥 Rendering ChatUiClient");
-  console.log("👉 Current user name:", name);
-  console.log("👉 Chat slug:", slug);
+  // ✅ Get chat from DB once
+  useEffect(() => {
+    if (!name || !slug) return;
+    const takeChat = { senderId: name, receiverId: slug };
 
-  const handleClick = () => {
-    console.log("💬 Send button clicked");
-    console.log("✉️ Input value:", inputValue);
+    const getChats = async () => {
+      const res = await fetch("/api/getchat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(takeChat),
+      });
+      const data = await res.json();
+      setDatas(data?.FIndChat || []);
+    };
 
-    if (!inputValue.trim()) {
-      console.log("⚠️ Empty message, returning");
-      return;
-    }
+    getChats();
+  }, [name, slug]);
 
-    const newChat = {
+  // ✅ Real-time updates using socket
+  useEffect(() => {
+    socket.on("receiveMessage", (data) => {
+      console.log("📩 New message:", data);
+
+      // only show messages that belong to this chat pair
+      if (
+        (data.senderId === name && data.receiverId === slug) ||
+        (data.senderId === slug && data.receiverId === name)
+      ) {
+        setDatas((prev) => [...prev, data]);
+      }
+    });
+
+    return () => {
+      socket.off("receiveMessage");
+    };
+  }, [name, slug]);
+
+  // ✅ Send message
+  const handleSend = async () => {
+    if (!inputValue.trim()) return;
+
+    const newMsg = {
       senderId: name,
       receiverId: slug,
       message: inputValue,
     };
 
-    console.log("🛫 Sending chat to DB:", newChat);
-
-    setMessages((prev) => [...prev, inputValue]);
-    setInputValue("");
-    sendToDb(newChat);
-  };
-
-  const sendToDb = async (newChat) => {
+    // send to DB
     try {
-      console.log("📡 Calling /api/sendchat...");
-      const res = await fetch("/api/sendchat", {
+      await fetch("/api/sendchat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(newChat),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMsg),
       });
-      const data = await res.json();
-      console.log("✅ sendToDb response:", data);
-
-      if (!data.success) {
-        console.log("⚠️ Message not saved:", data.error);
-      }
     } catch (err) {
-      console.log("❌ sendToDb error:", err);
-    }
-  };
-
-  const takeChat = {
-    senderId: name,
-    receiverId: slug,
-  };
-
-  useEffect(() => { 
-    if (!name) {
-      console.log("⚠️ Name not yet available — skipping fetch");
-      return;
+      console.error("❌ DB Error:", err);
     }
 
-    console.log("📡 useEffect triggered — fetching chat from DB");
-
-    const getToDb = async () => {
-      try {
-        console.log("🧠 Sending request to /api/getchat:", takeChat);
-        const res = await fetch("/api/getchat", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(takeChat),
-        });
-        const data = await res.json();
-        console.log("📦 Received chat data:", data);
-
-        setDatas(data?.FIndChat);
-
-        if (!data.success) {
-          console.log("⚠️ Data fetch failed:", data.error);
-        }
-      } catch (err) {
-        console.log("❌ getToDb error:", err);
-      }
-    };
-
-    getToDb();
-  }, [name, slug]);
-
-  console.log("💾 Datas state right now:", datas);
+    // send through socket for instant update
+    socket.emit("sendMessage",newMsg)
+    setInputValue("");
+  };
 
   return (
     <main className="h-screen p-4 bg-gradient-to-br from-green-900/10 via-yellow-400 to-green-400 relative flex flex-col gap-6">
@@ -99,14 +80,15 @@ export default function ChatUiClient({ slug }) {
       </h1>
       <p className="mt-4 text-3xl font-bold">Chatting with: {slug}</p>
 
-      <section className="flex flex-col gap-4 overflow-y-auto">
-        {Array.isArray(datas) && datas.length > 0 ? (
-          datas.map((mes, index) => (
-            <div key={index}>
+      {/* Chat box */}
+      <section className="flex flex-col gap-3 overflow-y-auto">
+        {datas.length > 0 ? (
+          datas.map((mes, i) => (
+            <div key={i} className="w-full flex">
               <p
-                className={`shadow-2xl p-3 w-fit px-6 font-bold rounded-lg ${
+                className={`max-w-[60%] px-4 py-2 rounded-lg shadow ${
                   mes.senderId === name
-                    ? "bg-green-700 text-black"
+                    ? "bg-green-600 text-white ml-auto"
                     : "bg-white text-black"
                 }`}
               >
@@ -115,22 +97,21 @@ export default function ChatUiClient({ slug }) {
             </div>
           ))
         ) : (
-          <p className="text-center text-gray-700 font-semibold">
-            No messages yet
-          </p>
+          <p className="text-center text-gray-700">No messages yet</p>
         )}
       </section>
 
+      {/* Input */}
       <div className="w-full absolute bottom-5 flex justify-center items-center gap-3">
         <input
           type="text"
-          placeholder="Enter Text to message"
-          className="border-black border-4 focus:outline-none focus:ring-2 focus:ring-blue-500 px-4 py-2 rounded-lg"
+          placeholder="Enter your message..."
+          className="border-2 border-black rounded-lg px-4 py-2 w-1/2 focus:outline-none"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
         />
         <button
-          onClick={handleClick}
+          onClick={handleSend}
           className="bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
         >
           Send
