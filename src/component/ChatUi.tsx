@@ -3,7 +3,10 @@ import { useContext, useEffect, useState } from "react";
 import { UserContext } from "@/src/context/userContext";
 import { io } from "socket.io-client";
 
-const socket = io("https://localhost:3001", { transports: ["websocket"] });
+const socket = io("http://localhost:3001", {
+  transports: ["websocket"]
+});
+
 
 export default function ChatUiClient({ slug }) {
   const { name } = useContext(UserContext);
@@ -12,6 +15,26 @@ export default function ChatUiClient({ slug }) {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0])
+  }
+const handleUpload = async () => {
+  if (!selectedFile) return;
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+
+  const res = await fetch("http://localhost:4000/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await res.json();
+  console.log(data);
+  alert("File uploaded: " + data.filename);
+};
   // ✅ Get chat from DB once
   useEffect(() => {
     if (!name || !slug) return;
@@ -166,6 +189,9 @@ export default function ChatUiClient({ slug }) {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
         />
+     <input type="file" onChange={handleFileChange} />
+<button onClick={handleUpload}>Upload</button>
+
         <button
           onClick={handleSend}
           className="bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
