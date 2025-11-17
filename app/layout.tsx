@@ -1,6 +1,9 @@
+// app/layout.tsx
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Navbar from "@/src/component/Navbar"; // <-- 1. Import Navbar
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +30,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <Navbar /> {/* <-- 2. Put Navbar here, outside/above children */}
+        <main>{children}</main> {/* <-- 3. Your pages will go here */}
       </body>
     </html>
   );
